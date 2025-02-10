@@ -1,0 +1,82 @@
+package com.expense.claim.controller;
+
+import com.expense.claim.models.ExpenseHeader;
+import com.expense.claim.models.ExpenseLineItem;
+import com.expense.claim.models.ExpenseType;
+import com.expense.claim.payload.request.ExpenseLineItemRequest;
+import com.expense.claim.payload.response.MessageResponse;
+import com.expense.claim.repository.ExpenseHeaderRepository;
+import com.expense.claim.repository.ExpenseLineItemRepository;
+import com.expense.claim.repository.ExpenseTypeRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Base64;
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/expense-line-items")
+public class ExpenseLineItemController {
+
+    @Autowired
+    private ExpenseLineItemRepository expenseLineItemRepository;
+
+    @Autowired
+    private ExpenseHeaderRepository expenseHeaderRepository;
+
+    @Autowired
+    private ExpenseTypeRepository expenseTypeRepository;
+
+    private static final List<String> ALLOWED_FILE_TYPES = List.of("image/jpeg", "image/png", "application/pdf");
+
+    // **Create a new expense line item with file validation**
+    @PostMapping
+    public ResponseEntity<?> createExpenseLineItem(@RequestBody ExpenseLineItemRequest request) {
+        // Validate file type
+        if (!ALLOWED_FILE_TYPES.contains(request.getFileType())) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Invalid file type! Allowed types are JPG, PNG, and PDF."));
+        }
+
+        // Optional: Validate file size (max 5 MB)
+        byte[] fileData = Base64.getDecoder().decode(request.getFileData());
+        if (fileData.length > 5 * 1024 * 1024) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: File size exceeds the limit of 5 MB."));
+        }
+
+        // Validate and fetch related entities
+        Optional<ExpenseHeader> expenseHeader = expenseHeaderRepository.findById(request.getExpenseHeaderId());
+        if (expenseHeader.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Expense header not found!"));
+        }
+
+        Optional<ExpenseType> expenseType = expenseTypeRepository.findById(request.getExpenseTypeId());
+        if (expenseType.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Expense type not found!"));
+        }
+
+        // Create and save the line item
+        ExpenseLineItem lineItem = new ExpenseLineItem();
+        lineItem.setExpenseHeader(expenseHeader.get());
+        lineItem.setExpenseType(expenseType.get());
+        lineItem.setDescription(request.getDescription());
+        lineItem.setAmount(new BigDecimal(request.getAmount()));
+        lineItem.setCreatedAt(LocalDateTime.now());
+        lineItem.setFileData(fileData);
+        lineItem.setFileName(request.getFileName());
+        lineItem.setFileType(request.getFileType());
+
+        expenseLineItemRepository.save(lineItem);
+        return ResponseEntity.ok(new MessageResponse("Expense line item created successfully!"));
+    }
+
+    // **Get all expense line items**
+    @GetMapping
+    public ResponseEntity<List<ExpenseLineItem>> getAllExpenseLineItems() {
+        return ResponseEntity.ok(expenseLineItemRepository.findAll());
+    }
+}

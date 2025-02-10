@@ -1,0 +1,108 @@
+package com.expense.claim.controller;
+
+import com.expense.claim.models.Budget;
+import com.expense.claim.models.Department;
+import com.expense.claim.payload.response.MessageResponse;
+import com.expense.claim.payload.response.UserInfoResponse;
+import com.expense.claim.repository.BudgetRepository;
+import com.expense.claim.repository.DepartmentRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/budgets")
+@CrossOrigin(origins = "*", maxAge = 3600)
+public class BudgetController {
+
+    @Autowired
+    private BudgetRepository budgetRepository;
+
+    @Autowired
+    private DepartmentRepository departmentRepository;
+    
+    @Autowired
+    private ApproverRequestController approverRequestController;
+    
+    @Autowired
+    private UserController userController;
+
+    // Get all budgets
+    @GetMapping
+    public ResponseEntity<List<Budget>> getAllBudgets() {
+        return ResponseEntity.ok(budgetRepository.findAll());
+    }
+
+    // Get budget by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getBudgetById(@PathVariable Long id) {
+        Optional<Budget> budget = budgetRepository.findById(id);
+        if (budget.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Budget not found!"));
+        }
+        return ResponseEntity.ok(budget.get());
+    }
+
+    // Get budgets by department ID
+    @GetMapping("/department/{departmentId}")
+    public ResponseEntity<List<Budget>> getBudgetsByDepartmentId(@PathVariable Long departmentId) {
+        List<Budget> budgets = budgetRepository.findByDepartmentId(departmentId);
+        return ResponseEntity.ok(budgets);
+    }
+
+    @PostMapping
+    public ResponseEntity<?> createBudget(@Valid @RequestBody Budget budgetRequest) {
+        // Retrieve the current user info (requestor)
+        ResponseEntity<UserInfoResponse> currentUserResponse = userController.getCurrentUserInfo();
+        if (currentUserResponse.getStatusCode().is4xxClientError()) {
+            return ResponseEntity.status(401).body(new MessageResponse("Error: Unauthorized!"));
+        }
+
+        UserInfoResponse currentUser = currentUserResponse.getBody();
+        if (currentUser == null) {
+            return ResponseEntity.status(500).body(new MessageResponse("Error: Unable to retrieve user information."));
+        }
+
+        // Check if the department exists
+        Optional<Department> department = departmentRepository.findById(budgetRequest.getDepartment().getId());
+        if (department.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Department not found!"));
+        }
+
+        // Set department and updated date
+        budgetRequest.setDepartment(department.get());
+        budgetRequest.setUpdatedAt(LocalDateTime.now());
+
+        // Save the budget
+        Budget budget = budgetRepository.save(budgetRequest);
+
+        // Dynamically trigger an approver request after budget creation
+        approverRequestController.createApproverRequest(
+                currentUser.getId(),            // Requestor ID from current user info
+                2L,                             // Example approver ID; replace with actual approver logic
+                "Budget Approval",
+                budget.getId()
+        );
+
+        return ResponseEntity.ok(budget);
+    }
+
+    // Delete a budget
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteBudget(@PathVariable Long id) {
+        if (!budgetRepository.existsById(id)) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Budget not found!"));
+        }
+
+        budgetRepository.deleteById(id);
+        return ResponseEntity.ok(new MessageResponse("Budget deleted successfully!"));
+    }
+}

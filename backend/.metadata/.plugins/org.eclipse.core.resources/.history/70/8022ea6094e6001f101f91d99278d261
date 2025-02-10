@@ -1,0 +1,5 @@
+package com.expense.claim.security.services;
+
+public class UserDetailsServiceImpl {
+
+}

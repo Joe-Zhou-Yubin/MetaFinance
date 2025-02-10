@@ -1,0 +1,5 @@
+package com.expense.claim.payload.response;
+
+public class BudgetResponse {
+
+}

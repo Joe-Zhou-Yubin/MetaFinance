@@ -1,0 +1,139 @@
+package com.expense.claim.controller;
+
+import com.expense.claim.models.ExpenseHeader;
+import com.expense.claim.models.ExpenseLineItem;
+import com.expense.claim.models.UserDepartment;
+import com.expense.claim.payload.response.ExpenseHeaderResponse;
+import com.expense.claim.payload.response.ExpenseLineItemResponse;
+import com.expense.claim.payload.response.MessageResponse;
+import com.expense.claim.repository.ExpenseHeaderRepository;
+import com.expense.claim.repository.ExpenseLineItemRepository;
+import com.expense.claim.repository.ExpenseTypeRepository;
+import com.expense.claim.repository.UserDepartmentRepository;
+import com.expense.claim.security.services.UserDetailsImpl;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+
+@RestController
+@RequestMapping("/api/expenses")
+public class ExpenseController {
+
+    @Autowired
+    private ExpenseHeaderRepository expenseHeaderRepository;
+
+    @Autowired
+    private ExpenseLineItemRepository expenseLineItemRepository;
+
+    @Autowired
+    private UserDepartmentRepository userDepartmentRepository;
+
+    @Autowired
+    private ExpenseTypeRepository expenseTypeRepository;
+
+    // **Create Expense Header**
+    @PostMapping("/header")
+    public ResponseEntity<?> createExpenseHeader(@Valid @RequestBody ExpenseHeader expenseHeaderRequest) {
+        // Retrieve the current user info (requestor)
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserDetailsImpl currentUser = (UserDetailsImpl) authentication.getPrincipal();
+
+        // Fetch the department for the current user
+        Optional<UserDepartment> userDepartmentOptional = userDepartmentRepository.findByUserId(currentUser.getId());
+        if (userDepartmentOptional.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: No department mapping found for the user."));
+        }
+
+        UserDepartment userDepartment = userDepartmentOptional.get();
+
+        // Set requestor and header details
+        expenseHeaderRequest.setRequestorId(currentUser.getId());
+        expenseHeaderRequest.setDepartment(userDepartment.getDepartment());
+        expenseHeaderRequest.setCreatedAt(LocalDateTime.now());
+        expenseHeaderRequest.setTotalAmount(BigDecimal.ZERO);
+        expenseHeaderRequest.setSubmitted(false);  // Default submitted value is 0
+
+        // Save the expense header
+        ExpenseHeader savedHeader = expenseHeaderRepository.save(expenseHeaderRequest);
+        ExpenseHeaderResponse response = mapToExpenseHeaderResponse(savedHeader);
+        return ResponseEntity.ok(response);
+    }
+    
+ // Helper method to map ExpenseHeader to ExpenseHeaderResponseDTO
+    private ExpenseHeaderResponse mapToExpenseHeaderResponse(ExpenseHeader header) {
+        List<ExpenseLineItemResponse> lineItems = Optional.ofNullable(header.getLineItems())
+        		.orElse(List.of())
+        		.stream()
+                .map(this::mapToExpenseLineItemResponse)
+                .collect(Collectors.toList());
+
+        return new ExpenseHeaderResponse(
+                header.getId(),
+                header.getDescription(),
+                header.getDepartment().getName(),
+                header.getTotalAmount(),
+                header.isSubmitted(),
+                header.getCreatedAt(),
+                lineItems
+        );
+    }
+    
+ // Helper method to map ExpenseLineItem to ExpenseLineItemResponseDTO
+    private ExpenseLineItemResponse mapToExpenseLineItemResponse(ExpenseLineItem lineItem) {
+        return new ExpenseLineItemResponse(
+                lineItem.getId(),
+                lineItem.getExpenseType().getName(),
+                lineItem.getDescription(),
+                lineItem.getAmount(),
+                lineItem.getCreatedAt()
+        );
+    }
+    
+ // **Create Expense Line Item**
+    @PostMapping("/line/{id}")
+    public ResponseEntity<?> createExpenseLineItem(@PathVariable Long id, @Valid @RequestBody ExpenseLineItem lineItemRequest) {
+        // Retrieve the expense header by ID
+        Optional<ExpenseHeader> headerOptional = expenseHeaderRepository.findById(id);
+        if (headerOptional.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Expense header not found."));
+        }
+
+        ExpenseHeader expenseHeader = headerOptional.get();
+
+        // Validate the expense type
+        if (lineItemRequest.getExpenseType() == null || 
+            !expenseTypeRepository.existsById(lineItemRequest.getExpenseType().getId())) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Invalid expense type."));
+        }
+
+        // Set the necessary details for the line item
+        lineItemRequest.setExpenseHeader(expenseHeader);
+        lineItemRequest.setCreatedAt(LocalDateTime.now());
+
+        // Save the line item
+        ExpenseLineItem savedLineItem = expenseLineItemRepository.save(lineItemRequest);
+
+        // Update the total amount in the expense header
+        BigDecimal updatedTotalAmount = expenseHeader.getTotalAmount().add(savedLineItem.getAmount());
+        expenseHeader.setTotalAmount(updatedTotalAmount);
+        expenseHeaderRepository.save(expenseHeader);
+
+        // Return the response
+        ExpenseLineItemResponse response = mapToExpenseLineItemResponse(savedLineItem);
+        return ResponseEntity.ok(response);
+    }
+    
+    
+
+}

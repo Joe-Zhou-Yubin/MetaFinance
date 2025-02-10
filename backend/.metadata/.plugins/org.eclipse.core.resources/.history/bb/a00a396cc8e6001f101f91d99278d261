@@ -1,0 +1,110 @@
+package com.expense.claim.models;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Entity
+@Table(name = "expense_headers")
+public class ExpenseHeader {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "requestor_id", nullable = false)
+    private User requestor;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "department_id", nullable = false)
+    private Department department;
+
+    @Column(nullable = false)
+    private boolean approved;
+
+    @Column(nullable = false, precision = 15, scale = 2)
+    private BigDecimal total;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "expenseHeader", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ExpenseLineItem> lineItems;
+
+    
+    
+	public ExpenseHeader() {
+	}
+
+	public ExpenseHeader(Long id, User requestor, Department department, boolean approved, BigDecimal total,
+			LocalDateTime createdAt, List<ExpenseLineItem> lineItems) {
+		super();
+		this.id = id;
+		this.requestor = requestor;
+		this.department = department;
+		this.approved = approved;
+		this.total = total;
+		this.createdAt = createdAt;
+		this.lineItems = lineItems;
+	}
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
+	public User getRequestor() {
+		return requestor;
+	}
+
+	public void setRequestor(User requestor) {
+		this.requestor = requestor;
+	}
+
+	public Department getDepartment() {
+		return department;
+	}
+
+	public void setDepartment(Department department) {
+		this.department = department;
+	}
+
+	public boolean isApproved() {
+		return approved;
+	}
+
+	public void setApproved(boolean approved) {
+		this.approved = approved;
+	}
+
+	public BigDecimal getTotal() {
+		return total;
+	}
+
+	public void setTotal(BigDecimal total) {
+		this.total = total;
+	}
+
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
+
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
+	}
+
+	public List<ExpenseLineItem> getLineItems() {
+		return lineItems;
+	}
+
+	public void setLineItems(List<ExpenseLineItem> lineItems) {
+		this.lineItems = lineItems;
+	}
+    
+    
+}

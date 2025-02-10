@@ -1,0 +1,32 @@
+package com.expense.claim.payload.response;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+public class CommitmentResponse {
+    private Long id;
+    private String requestorName;
+    private String departmentName;
+    private String description;
+    private BigDecimal amount;
+    private boolean approved;
+    private boolean paid;
+    private LocalDateTime createdAt;
+    private LocalDateTime approvedAt;
+
+    public CommitmentResponse(Long id, String requestorName, String departmentName, String description,
+                              BigDecimal amount, boolean approved, boolean paid, LocalDateTime createdAt,
+                              LocalDateTime approvedAt) {
+        this.id = id;
+        this.requestorName = requestorName;
+        this.departmentName = departmentName;
+        this.description = description;
+        this.amount = amount;
+        this.approved = approved;
+        this.paid = paid;
+        this.createdAt = createdAt;
+        this.approvedAt = approvedAt;
+    }
+
+    // Getters and setters (if needed)
+}

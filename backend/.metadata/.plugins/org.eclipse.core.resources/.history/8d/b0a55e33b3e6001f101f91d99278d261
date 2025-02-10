@@ -1,0 +1,72 @@
+package com.expense.claim.models;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "approvers")
+public class ApproverRequest {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "requestor_id", nullable = false)
+    private User requestor;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "approver_id", nullable = false)
+    private User approver;
+
+    @Column(nullable = false, length = 100)
+    private String type;
+
+    @Column(name = "reference_id", nullable = false)
+    private Long referenceId;  // Mandatory reference ID
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RequestStatus status;  // Enum type for statuses
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "notified_at")
+    private LocalDateTime notifiedAt;  // Timestamp for when notification was sent
+
+    @Column(name = "reject_reason", columnDefinition = "TEXT")
+    private String rejectReason;  // Reason for rejection, if applicable
+
+    public ApproverRequest() {
+    }
+
+    public ApproverRequest(User requestor, User approver, String type, Long referenceId) {
+        this.requestor = requestor;
+        this.approver = approver;
+        this.type = type;
+        this.referenceId = referenceId;
+        this.createdAt = LocalDateTime.now();
+        this.status = RequestStatus.PENDING;
+    }
+
+    // Getters and setters...
+
+    @Override
+    public String toString() {
+        return "ApproverRequest{" +
+               "id=" + id +
+               ", requestor=" + (requestor != null ? requestor.getId() : null) +
+               ", approver=" + (approver != null ? approver.getId() : null) +
+               ", type='" + type + '\'' +
+               ", referenceId=" + referenceId +
+               ", status=" + status +
+               ", createdAt=" + createdAt +
+               ", approvedAt=" + approvedAt +
+               ", notifiedAt=" + notifiedAt +
+               ", rejectReason='" + rejectReason + '\'' +
+               '}';
+    }
+}

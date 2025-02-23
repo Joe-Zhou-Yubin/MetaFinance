@@ -13,6 +13,7 @@ import com.expense.claim.repository.CommitmentRepository;
 import com.expense.claim.repository.DepartmentRepository;
 import com.expense.claim.repository.UserDepartmentRepository;
 import com.expense.claim.repository.UserRepository;
+import com.expense.claim.service.ApproverDerivationService;
 import com.expense.claim.payload.response.CommitmentResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -48,7 +49,10 @@ public class CommitmentController {
     
     @Autowired
     private UserRepository userRepository;
-
+    
+    @Autowired
+    private ApproverDerivationService approverDerivationService;
+    
  // **Create a new commitment**
     @PostMapping
     public ResponseEntity<?> createCommitment(@Valid @RequestBody Commitment commitmentRequest) {
@@ -79,6 +83,7 @@ public class CommitmentController {
         System.out.println("Department found: " + userDepartment.getDepartment().getName() +
                            " (Department ID: " + userDepartment.getDepartment().getId() + ")");
 
+        // Set commitment details
         commitmentRequest.setRequestor(userDepartment.getUser());
         commitmentRequest.setDepartment(userDepartment.getDepartment());
         commitmentRequest.setCreatedAt(LocalDateTime.now());
@@ -86,27 +91,37 @@ public class CommitmentController {
         commitmentRequest.setPaid(false);
 
         Commitment commitment = commitmentRepository.save(commitmentRequest);
-        
-        User departmentHead = userDepartment.getDepartment().getHead();
-        if (departmentHead == null) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error: Department head not assigned."));
+
+        // Use ApprovalMatrix to derive the approver dynamically
+        Optional<Long> approverIdOptional = approverDerivationService.deriveApprover(currentUser.getId(), "Commitment");
+        if (approverIdOptional.isEmpty()) {
+            System.out.println("Error: No approver found for Commitment approval.");
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: No approver found for Commitment approval."));
         }
 
-        System.out.println("Department Head ID: " + departmentHead.getId() + " - " + departmentHead.getUsername());
-        
-     // Create and save an approver request for the department head
+        Long approverId = approverIdOptional.get();
+        Optional<User> approverOptional = userRepository.findById(approverId);
+
+        if (approverOptional.isEmpty()) {
+            System.out.println("Error: Approver user not found with ID: " + approverId);
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Approver user not found."));
+        }
+
+        User approver = approverOptional.get();
+        System.out.println("Approver ID: " + approver.getId() + " - " + approver.getUsername());
+
+        // ✅ Create and save an approver request
         ApproverRequest approverRequest = new ApproverRequest();
         approverRequest.setRequestor(userDepartment.getUser());
-        approverRequest.setApprover(departmentHead);
+        approverRequest.setApprover(approver);
         approverRequest.setType("Commitment Approval");
         approverRequest.setReferenceId(commitment.getId());
         approverRequest.setStatus(RequestStatus.PENDING);
         approverRequest.setCreatedAt(LocalDateTime.now());
 
         approverRequestRepository.save(approverRequest);
-        
-        
-        // Return the DTO instead of the entity
+
+        // ✅ Return DTO response
         CommitmentResponse response = new CommitmentResponse(
             commitment.getId(),
             commitment.getRequestor().getUsername(),
@@ -121,6 +136,7 @@ public class CommitmentController {
 
         return ResponseEntity.ok(response);
     }
+
 
 
 

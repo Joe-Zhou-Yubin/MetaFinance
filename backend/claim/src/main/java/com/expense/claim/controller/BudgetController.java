@@ -6,6 +6,7 @@ import com.expense.claim.payload.response.MessageResponse;
 import com.expense.claim.payload.response.UserInfoResponse;
 import com.expense.claim.repository.BudgetRepository;
 import com.expense.claim.repository.DepartmentRepository;
+import com.expense.claim.service.ApproverDerivationService;
 import com.expense.claim.payload.response.BudgetResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -38,6 +39,9 @@ public class BudgetController {
     
     @Autowired
     private UserController userController;
+    
+    @Autowired
+    private ApproverDerivationService approverDerivationService;
 
  // Get all budgets - admin method
     @GetMapping
@@ -143,6 +147,54 @@ public class BudgetController {
     
     
 
+//    @PostMapping
+//    public ResponseEntity<?> createBudget(@Valid @RequestBody Budget budgetRequest) {
+//        // Retrieve the current user info (requestor)
+//        ResponseEntity<UserInfoResponse> currentUserResponse = userController.getCurrentUserInfo();
+//        if (currentUserResponse.getStatusCode().is4xxClientError()) {
+//            return ResponseEntity.status(401).body(new MessageResponse("Error: Unauthorized!"));
+//        }
+//
+//        UserInfoResponse currentUser = currentUserResponse.getBody();
+//        if (currentUser == null) {
+//            return ResponseEntity.status(500).body(new MessageResponse("Error: Unable to retrieve user information."));
+//        }
+//
+//        // Check if the department exists
+//        Optional<Department> department = departmentRepository.findById(budgetRequest.getDepartment().getId());
+//        if (department.isEmpty()) {
+//            return ResponseEntity.badRequest().body(new MessageResponse("Error: Department not found!"));
+//        }
+//
+//        // Set department and updated date
+//        budgetRequest.setDepartment(department.get());
+//        budgetRequest.setUpdatedAt(LocalDateTime.now());
+//
+//        // Save the budget
+//        Budget budget = budgetRepository.save(budgetRequest);
+//
+//        // Retrieve the admin user info
+//        ResponseEntity<?> adminUserResponse = userController.getAdminUser();
+//        if (adminUserResponse.getStatusCode().is4xxClientError()) {
+//            return ResponseEntity.badRequest().body(new MessageResponse("Error: Admin user not found!"));
+//        }
+//
+//        UserInfoResponse adminUser = (UserInfoResponse) adminUserResponse.getBody();
+//        if (adminUser == null) {
+//            return ResponseEntity.status(500).body(new MessageResponse("Error: Unable to retrieve admin user information."));
+//        }
+//
+//        // Dynamically trigger an approver request after budget creation
+//        approverRequestController.createApproverRequest(
+//                currentUser.getId(),               // Requestor ID from current user info
+//                adminUser.getId(),                 // Approver ID from the admin user info
+//                "Budget Approval",
+//                budget.getId()
+//        );
+//
+//        return ResponseEntity.ok(budget);
+//    }
+    
     @PostMapping
     public ResponseEntity<?> createBudget(@Valid @RequestBody Budget budgetRequest) {
         // Retrieve the current user info (requestor)
@@ -169,27 +221,23 @@ public class BudgetController {
         // Save the budget
         Budget budget = budgetRepository.save(budgetRequest);
 
-        // Retrieve the admin user info
-        ResponseEntity<?> adminUserResponse = userController.getAdminUser();
-        if (adminUserResponse.getStatusCode().is4xxClientError()) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error: Admin user not found!"));
+        // Use ApprovalMatrix to derive approver
+        Optional<Long> approverId = approverDerivationService.deriveApprover(currentUser.getId(), "Budget");
+        if (approverId.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: No approver found for the budget approval process."));
         }
 
-        UserInfoResponse adminUser = (UserInfoResponse) adminUserResponse.getBody();
-        if (adminUser == null) {
-            return ResponseEntity.status(500).body(new MessageResponse("Error: Unable to retrieve admin user information."));
-        }
-
-        // Dynamically trigger an approver request after budget creation
+        // Dynamically trigger an approver request
         approverRequestController.createApproverRequest(
-                currentUser.getId(),               // Requestor ID from current user info
-                adminUser.getId(),                 // Approver ID from the admin user info
+                currentUser.getId(),
+                approverId.get(),
                 "Budget Approval",
                 budget.getId()
         );
 
         return ResponseEntity.ok(budget);
     }
+
 
     // Delete a budget
     @DeleteMapping("/{id}")

@@ -1,5 +1,0 @@
-package com.expense.claim.repository;
-
-public class DepartmentRepository {
-
-}

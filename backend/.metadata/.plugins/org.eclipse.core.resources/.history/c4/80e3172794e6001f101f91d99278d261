@@ -1,5 +1,0 @@
-package com.expense.claim.security.jwt;
-
-public class AuthEntryPointJwt {
-
-}

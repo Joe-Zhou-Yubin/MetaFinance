@@ -2,15 +2,22 @@ package com.expense.claim.controller;
 
 import com.expense.claim.models.ExpenseHeader;
 import com.expense.claim.models.ExpenseLineItem;
+import com.expense.claim.models.RequestStatus;
+import com.expense.claim.models.User;
 import com.expense.claim.models.UserDepartment;
 import com.expense.claim.payload.response.ExpenseHeaderResponse;
 import com.expense.claim.payload.response.ExpenseLineItemResponse;
 import com.expense.claim.payload.response.MessageResponse;
+import com.expense.claim.repository.ApproverRequestRepository;
 import com.expense.claim.repository.ExpenseHeaderRepository;
 import com.expense.claim.repository.ExpenseLineItemRepository;
 import com.expense.claim.repository.ExpenseTypeRepository;
 import com.expense.claim.repository.UserDepartmentRepository;
+import com.expense.claim.repository.UserRepository;
 import com.expense.claim.security.services.UserDetailsImpl;
+import com.expense.claim.service.ApproverDerivationService;
+import com.expense.claim.models.ApproverRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -40,9 +47,18 @@ public class ExpenseController {
 
     @Autowired
     private UserDepartmentRepository userDepartmentRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private ExpenseTypeRepository expenseTypeRepository;
+    
+    @Autowired
+    private ApproverDerivationService approverDerivationService;
+    
+    @Autowired
+    private ApproverRequestRepository approverRequestRepository;
 
     // **Create Expense Header**
     @PostMapping("/header")
@@ -188,5 +204,76 @@ public class ExpenseController {
 
         return ResponseEntity.ok(responses);
     }
+    
+    @PutMapping("/header/submit/{id}")
+    public ResponseEntity<?> submitExpenseHeader(@PathVariable Long id) {
+        System.out.println("Received request to submit expense header with ID: " + id);
+
+        // Retrieve the current user info (requestor)
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserDetailsImpl currentUser = (UserDetailsImpl) authentication.getPrincipal();
+        System.out.println("Current User ID: " + currentUser.getId());
+
+        // Retrieve the expense header by ID
+        Optional<ExpenseHeader> headerOptional = expenseHeaderRepository.findById(id);
+        if (headerOptional.isEmpty()) {
+            System.out.println("Error: Expense header not found for ID: " + id);
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Expense header not found."));
+        }
+
+        ExpenseHeader expenseHeader = headerOptional.get();
+        if (expenseHeader.isSubmitted()) {
+            System.out.println("Error: Expense header is already submitted.");
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Expense header is already submitted."));
+        }
+
+        // Update the submitted flag
+        expenseHeader.setSubmitted(true);
+        expenseHeaderRepository.save(expenseHeader);
+        System.out.println("Expense header submitted successfully.");
+
+        // ✅ Use ApprovalMatrix to derive the approver dynamically
+        Optional<Long> approverIdOptional = approverDerivationService.deriveApprover(currentUser.getId(), "Expense");
+        if (approverIdOptional.isEmpty()) {
+            System.out.println("Error: No approver found for Expense approval.");
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: No approver found for Expense approval."));
+        }
+
+        Long approverId = approverIdOptional.get();
+        Optional<User> approverOptional = userRepository.findById(approverId);
+
+        if (approverOptional.isEmpty()) {
+            System.out.println("Error: Approver user not found with ID: " + approverId);
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Approver user not found."));
+        }
+
+        User approver = approverOptional.get();
+        System.out.println("Approver ID: " + approver.getId() + " - " + approver.getUsername());
+
+        // ✅ Retrieve the requestor using requestorId
+        Optional<User> requestorOptional = userRepository.findById(expenseHeader.getRequestorId());
+        if (requestorOptional.isEmpty()) {
+            System.out.println("Error: Requestor user not found with ID: " + expenseHeader.getRequestorId());
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Requestor user not found."));
+        }
+
+        User requestor = requestorOptional.get();
+
+        // ✅ Create and save an approver request
+        ApproverRequest approverRequest = new ApproverRequest();
+        approverRequest.setRequestor(requestor);
+        approverRequest.setApprover(approver);
+        approverRequest.setType("Expense Approval");
+        approverRequest.setReferenceId(expenseHeader.getId());
+        approverRequest.setStatus(RequestStatus.PENDING);
+        approverRequest.setCreatedAt(LocalDateTime.now());
+
+        approverRequestRepository.save(approverRequest);
+        System.out.println("Approver request created successfully for Expense approval.");
+
+        return ResponseEntity.ok(new MessageResponse("Expense header submitted and approval request triggered successfully."));
+    }
+
+
 
 }

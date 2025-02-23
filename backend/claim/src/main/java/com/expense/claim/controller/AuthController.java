@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -83,6 +84,7 @@ public class AuthController {
   
   // Handle user registration
   @PostMapping("/signup")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
 //      System.out.println("Received signup request for username: " + signUpRequest.getUsername());
       
@@ -128,6 +130,13 @@ public class AuthController {
                       roles.add(adminRole);
 
                       break;
+                      
+                  case "director":
+                      Role directorRole = roleRepository.findByName(ERole.ROLE_DIRECTOR)
+                          .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+                      roles.add(directorRole);
+                      break;
+                      
                   default:
                       Role userRole = roleRepository.findByName(ERole.ROLE_MEMBER)
                           .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
@@ -145,6 +154,7 @@ public class AuthController {
 
   // Get a list of all users
   @GetMapping("/users")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<List<User>> getAllUsers() {
     List<User> users = userRepository.findAll();
     return ResponseEntity.ok(users);

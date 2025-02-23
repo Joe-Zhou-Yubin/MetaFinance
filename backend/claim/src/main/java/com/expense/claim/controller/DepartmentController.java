@@ -3,7 +3,9 @@ package com.expense.claim.controller;
 import com.expense.claim.dto.DepartmentDTO;
 import com.expense.claim.dto.UserDTO;
 import com.expense.claim.models.Department;
+import com.expense.claim.models.User;
 import com.expense.claim.repository.DepartmentRepository;
+import com.expense.claim.repository.UserRepository;
 import com.expense.claim.payload.response.MessageResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,9 @@ public class DepartmentController {
 
     @Autowired
     private DepartmentRepository departmentRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
 
     // Get all departments
     @GetMapping
@@ -60,9 +65,20 @@ public class DepartmentController {
         if (departmentRepository.findByName(department.getName()).isPresent()) {
             return ResponseEntity.badRequest().body(new MessageResponse("Error: Department already exists!"));
         }
+
+        // NEW: Load the user from the database before assigning as head
+        if (department.getHead() != null && department.getHead().getId() != null) {
+            Optional<User> userOptional = userRepository.findById(department.getHead().getId());
+            if (userOptional.isEmpty()) {
+                return ResponseEntity.badRequest().body(new MessageResponse("Error: User not found!"));
+            }
+            department.setHead(userOptional.get());
+        }
+
         departmentRepository.save(department);
         return ResponseEntity.ok(new MessageResponse("Department created successfully!"));
     }
+
 
     // Update department details
     @PutMapping("/{id}")

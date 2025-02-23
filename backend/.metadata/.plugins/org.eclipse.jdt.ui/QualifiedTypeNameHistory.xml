@@ -2,4 +2,15 @@
 <qualifiedTypeNameHistroy>
     <fullyQualifiedTypeName name="com.expense.claim.models.ExpenseHeader"/>
     <fullyQualifiedTypeName name="com.expense.claim.repository.ExpenseHeaderRepository"/>
+    <fullyQualifiedTypeName name="jakarta.validation.Valid"/>
+    <fullyQualifiedTypeName name="org.springframework.stereotype.Service"/>
+    <fullyQualifiedTypeName name="org.springframework.data.repository.query.Param"/>
+    <fullyQualifiedTypeName name="org.springframework.data.jpa.repository.Query"/>
+    <fullyQualifiedTypeName name="com.expense.claim.controller.ApprovalMatrixController.ApproverDerivationService"/>
+    <fullyQualifiedTypeName name="com.expense.claim.service.ApproverDerivationService"/>
+    <fullyQualifiedTypeName name="com.expense.claim.repository.DepartmentRepository"/>
+    <fullyQualifiedTypeName name="java.util.List"/>
+    <fullyQualifiedTypeName name="com.expense.claim.models.RequestStatus"/>
+    <fullyQualifiedTypeName name="com.expense.claim.models.User"/>
+    <fullyQualifiedTypeName name="com.expense.claim.repository.UserRepository"/>
 </qualifiedTypeNameHistroy>

@@ -19,14 +19,17 @@ public interface ApproverRequestRepository extends JpaRepository<ApproverRequest
     // Find requests by requestor ID
     List<ApproverRequest> findByRequestorId(Long requestorId);
 
-    // Find requests by type and reference ID
-    Optional<ApproverRequest> findByTypeAndReferenceId(String type, Long referenceId);
+    // Find all requests by type and reference ID
+    List<ApproverRequest> findByTypeAndReferenceId(String type, Long referenceId);
+
+    // Delete all approval requests related to a commitment
+    void deleteByTypeAndReferenceId(String type, Long referenceId);
 
     // Count pending requests for an approver
     long countByApproverIdAndStatus(Long approverId, RequestStatus status);
-    
+
     @Query("SELECT ar FROM ApproverRequest ar WHERE ar.status = :status AND ar.referenceId IN " +
             "(SELECT b.id FROM Budget b WHERE b.department.id = :departmentId)")
-     List<ApproverRequest> findPendingByDepartmentId(@Param("departmentId") Long departmentId, 
-                                                     @Param("status") RequestStatus status);
+    List<ApproverRequest> findPendingByDepartmentId(@Param("departmentId") Long departmentId, 
+                                                    @Param("status") RequestStatus status);
 }

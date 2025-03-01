@@ -10,5 +10,9 @@ public interface CommitmentRepository extends JpaRepository<Commitment, Long> {
     List<Commitment> findByPaid(boolean paid);
     List<Commitment> findByDepartmentIdAndApprovedAndPaid(Long departmentId, boolean approved, boolean paid);
 	List<Commitment> findByApprovedAndPaid(boolean b, boolean c);
+	// Fetch all approved commitments
+    List<Commitment> findByApprovedTrue();
 
+    // Fetch approved commitments for a specific department
+    List<Commitment> findByDepartmentIdAndApprovedTrue(Long departmentId);
 }

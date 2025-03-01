@@ -20,8 +20,12 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.expense.claim.security.services.UserDetailsImpl;
 
 @RestController
+@CrossOrigin(origins = "*", maxAge = 3600)
 @RequestMapping("/api/approver-requests")
 public class ApproverRequestController {
 
@@ -79,73 +83,72 @@ public class ApproverRequestController {
 
         ApproverRequest request = requestOptional.get();
         request.setStatus(status);
-        
+
         if (status == RequestStatus.REJECTED) {
             request.setRejectReason(rejectReason);
         }
         request.setApprovedAt(LocalDateTime.now());
         approverRequestRepository.save(request);
-        
-     // Dynamically update the corresponding entity based on request type
+
+        // ✅ Dynamically update or delete the corresponding entity based on request type
         if ("Budget Approval".equalsIgnoreCase(request.getType())) {
-            // Fetch the budget associated with the reference ID
             Optional<Budget> budgetOptional = budgetRepository.findById(request.getReferenceId());
             if (budgetOptional.isPresent()) {
                 Budget budget = budgetOptional.get();
 
-                // Update the approved field based on the status
                 if (status == RequestStatus.APPROVED) {
                     budget.setApproved(true);
+                    budget.setUpdatedAt(LocalDateTime.now());
+                    budgetRepository.save(budget);
                 } else {
-                    budget.setApproved(false);  // Optional: Handle rejection by setting false (depends on your use case)
+                    // ❌ DELETE the rejected budget
+                    budgetRepository.deleteById(request.getReferenceId());
+                    return ResponseEntity.ok(new MessageResponse("Budget request rejected and deleted."));
                 }
-
-                budget.setUpdatedAt(LocalDateTime.now());
-                budgetRepository.save(budget);
             } else {
                 return ResponseEntity.badRequest().body(new MessageResponse("Error: Budget not found for approval request!"));
             }
         } else if ("Commitment Approval".equalsIgnoreCase(request.getType())) {
-            // Handle "Commitment Approval"
             Optional<Commitment> commitmentOptional = commitmentRepository.findById(request.getReferenceId());
             if (commitmentOptional.isPresent()) {
                 Commitment commitment = commitmentOptional.get();
 
-                // Update the approved field based on the status
                 if (status == RequestStatus.APPROVED) {
                     commitment.setApproved(true);
+                    commitment.setApprovedAt(LocalDateTime.now());
+                    commitmentRepository.save(commitment);
                 } else {
-                    commitment.setApproved(false);
+                    // ❌ DELETE the rejected commitment
+                    commitmentRepository.deleteById(request.getReferenceId());
+                    return ResponseEntity.ok(new MessageResponse("Commitment request rejected and deleted."));
                 }
-
-                commitment.setApprovedAt(LocalDateTime.now());
-                commitmentRepository.save(commitment);
             } else {
                 return ResponseEntity.badRequest().body(new MessageResponse("Error: Commitment not found for approval request!"));
             }
         } else if ("Expense Approval".equalsIgnoreCase(request.getType())) {
-        	Optional<ExpenseHeader> expenseOptional = expenseHeaderRepository.findById(request.getReferenceId());
-        	if (expenseOptional.isPresent()) {
-        		ExpenseHeader expenseHeader = expenseOptional.get();
-        		
-        		if (status == RequestStatus.APPROVED) {
-        			expenseHeader.setApproved(true);
-        		} else {
-        			expenseHeader.setApproved(false);
-        		}
-        		
-        		expenseHeader.setApprovedAt(LocalDateTime.now());
-        		expenseHeaderRepository.save(expenseHeader);
-        	} else {
+            Optional<ExpenseHeader> expenseOptional = expenseHeaderRepository.findById(request.getReferenceId());
+            if (expenseOptional.isPresent()) {
+                ExpenseHeader expenseHeader = expenseOptional.get();
+
+                if (status == RequestStatus.APPROVED) {
+                    expenseHeader.setApproved(true);
+                } else {
+                    // ❌ UNSET submitted flag if expense is rejected
+                    expenseHeader.setSubmitted(false);
+                }
+
+                expenseHeader.setApprovedAt(LocalDateTime.now());
+                expenseHeaderRepository.save(expenseHeader);
+            } else {
                 return ResponseEntity.badRequest().body(new MessageResponse("Error: Expense not found for approval request!"));
             }
-        }
-        else {
+        } else {
             return ResponseEntity.badRequest().body(new MessageResponse("Error: Unsupported request type!"));
         }
 
         return ResponseEntity.ok(new MessageResponse("Request status updated successfully!"));
     }
+
         
 
     // Notify approver (simulates notification by updating the notifiedAt field) -- not done yet
@@ -210,5 +213,22 @@ public class ApproverRequestController {
 
         return approverRequestRepository.save(request);
     }
+    
+ // ✅ New Method: Get Own Pending Requests
+    @GetMapping("/pending")
+    public ResponseEntity<List<ApproverRequest>> getOwnPendingRequests() {
+        // Get the currently authenticated user
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserDetailsImpl currentUser = (UserDetailsImpl) authentication.getPrincipal();
+
+        // Extract user ID from JWT token
+        Long approverId = currentUser.getId();
+
+        // Fetch pending approval requests for the logged-in user
+        List<ApproverRequest> pendingRequests = approverRequestRepository.findByApproverIdAndStatus(approverId, RequestStatus.PENDING);
+
+        return ResponseEntity.ok(pendingRequests);
+    }
+    
     
 }

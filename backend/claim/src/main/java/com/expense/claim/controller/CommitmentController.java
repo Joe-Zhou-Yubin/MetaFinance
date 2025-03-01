@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
+@CrossOrigin(origins = "*", maxAge = 3600)
 @RequestMapping("/api/commitments")
 public class CommitmentController {
 
@@ -159,16 +160,27 @@ public class CommitmentController {
         return ResponseEntity.ok(new MessageResponse("Commitment updated successfully!"));
     }
 
-    // **Delete a commitment**
+ // **Delete a commitment**
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCommitment(@PathVariable Long id) {
         if (!commitmentRepository.existsById(id)) {
             return ResponseEntity.badRequest().body(new MessageResponse("Error: Commitment not found!"));
         }
 
+        // Find and delete all approval requests associated with this commitment
+        List<ApproverRequest> approvalRequests = approverRequestRepository.findByTypeAndReferenceId("Commitment Approval", id);
+        
+        if (!approvalRequests.isEmpty()) {
+            approverRequestRepository.deleteAll(approvalRequests);
+        }
+
+        // Now delete the commitment
         commitmentRepository.deleteById(id);
-        return ResponseEntity.ok(new MessageResponse("Commitment deleted successfully!"));
+
+        return ResponseEntity.ok(new MessageResponse("Commitment and associated approval request(s) deleted successfully!"));
     }
+
+
 
  // **Get all commitments**
     @GetMapping

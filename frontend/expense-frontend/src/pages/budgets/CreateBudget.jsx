@@ -146,12 +146,22 @@ const CreateBudget = () => {
                         />
                     </div>
 
-                    <button
-                        type="submit"
-                        className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-500"
-                    >
-                        Create Budget
-                    </button>
+                    <div className="flex justify-between items-center">
+                        <button
+                            type="button"
+                            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                            onClick={() => navigate('/budgets')}
+                        >
+                            Back
+                        </button>
+
+                        <button
+                            type="submit"
+                            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-500"
+                        >
+                            Create Budget
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

@@ -12,11 +12,11 @@ const BurgerMenu = ({ isOpen, setIsOpen }) => {
     // Page dictionary with access control
     const pageAccess = {
         home: { path: "/home", name: "Home", roles: ["ROLE_MEMBER", "ROLE_DIRECTOR", "ROLE_ADMIN"] },
-        users: { path: "/users", name: "Users", roles: ["ROLE_ADMIN"] },
-        departments: { path: "/departments", name: "Departments", roles: ["ROLE_DIRECTOR", "ROLE_ADMIN"] },
+        inbox: { path: "/inbox", name: "Inbox", roles: ["ROLE_DIRECTOR", "ROLE_ADMIN"] },
         budgets: { path: "/budgets", name: "Budgets", roles: ["ROLE_DIRECTOR", "ROLE_ADMIN"] },
         commitments: { path: "/commitments", name: "Commitments", roles: ["ROLE_DIRECTOR", "ROLE_ADMIN"] },
-        expenses: { path: "/expenses", name: "Expenses", roles: ["ROLE_MEMBER", "ROLE_DIRECTOR", "ROLE_ADMIN"] },
+        expenses: { path: "/myexpenses", name: "Expenses", roles: ["ROLE_MEMBER", "ROLE_DIRECTOR", "ROLE_ADMIN"] },
+        configuration: { path: "/configuration", name: "Configuration", roles: ["ROLE_ADMIN"] },
     };
 
     // Check if user has access to the page

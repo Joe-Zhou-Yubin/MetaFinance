@@ -1,10 +1,14 @@
 package com.expense.claim.controller;
 
+import com.expense.claim.models.ApproverRequest;
 import com.expense.claim.models.Budget;
+import com.expense.claim.models.Commitment;
 import com.expense.claim.models.Department;
 import com.expense.claim.payload.response.MessageResponse;
 import com.expense.claim.payload.response.UserInfoResponse;
+import com.expense.claim.repository.ApproverRequestRepository;
 import com.expense.claim.repository.BudgetRepository;
+import com.expense.claim.repository.CommitmentRepository;
 import com.expense.claim.repository.DepartmentRepository;
 import com.expense.claim.service.ApproverDerivationService;
 import com.expense.claim.payload.response.BudgetResponse;
@@ -18,6 +22,7 @@ import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -38,10 +43,16 @@ public class BudgetController {
     private ApproverRequestController approverRequestController;
     
     @Autowired
+    private ApproverRequestRepository approverRequestRepository;
+    
+    @Autowired
     private UserController userController;
     
     @Autowired
     private ApproverDerivationService approverDerivationService;
+    
+    @Autowired
+    private CommitmentRepository commitmentRepository;
 
  // Get all budgets - admin method
     @GetMapping
@@ -239,14 +250,91 @@ public class BudgetController {
     }
 
 
-    // Delete a budget
+ // Delete a budget and its corresponding approval request
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteBudget(@PathVariable Long id) {
         if (!budgetRepository.existsById(id)) {
             return ResponseEntity.badRequest().body(new MessageResponse("Error: Budget not found!"));
         }
 
+        // Find and delete all approval requests associated with this budget
+        List<ApproverRequest> approvalRequests = approverRequestRepository.findByTypeAndReferenceId("Budget Approval", id);
+        
+        if (!approvalRequests.isEmpty()) {
+            approverRequestRepository.deleteAll(approvalRequests);
+        }
+
+        // Now delete the budget
         budgetRepository.deleteById(id);
-        return ResponseEntity.ok(new MessageResponse("Budget deleted successfully!"));
+        
+        return ResponseEntity.ok(new MessageResponse("Budget and associated approval request(s) deleted successfully!"));
     }
+
+
+    
+ // **Get Committed Budget for All Departments**
+    @GetMapping("/committed")
+    public ResponseEntity<List<BudgetResponse>> getCommittedBudgetForAllDepartments() {
+        // Fetch all approved budgets for all departments
+        List<Budget> latestApprovedBudgets = budgetRepository.findLatestApprovedBudgetsForAllDepartments();
+
+        // Fetch all approved commitments
+        List<Commitment> approvedCommitments = commitmentRepository.findByApprovedTrue();
+
+        // Group commitments by department ID and sum the amounts
+        Map<Long, BigDecimal> commitmentTotals = approvedCommitments.stream()
+            .collect(Collectors.groupingBy(
+                commitment -> commitment.getDepartment().getId(),  // Get department ID
+                Collectors.reducing(BigDecimal.ZERO, Commitment::getAmount, BigDecimal::add)
+            ));
+
+        // Process each budget and subtract commitments
+        List<BudgetResponse> response = latestApprovedBudgets.stream()
+            .map(budget -> {
+                BigDecimal totalCommitments = commitmentTotals.getOrDefault(budget.getDepartment().getId(), BigDecimal.ZERO);
+                BigDecimal committedBudget = budget.getAmount().subtract(totalCommitments);
+
+                return new BudgetResponse(
+                    budget.getId(),
+                    budget.getDepartment().getId(),
+                    budget.getDepartment().getName(),
+                    committedBudget,  // Remaining budget after commitments
+                    budget.isApproved(),
+                    budget.getUpdatedAt()
+                );
+            }).toList();
+
+        return ResponseEntity.ok(response);
+    }
+    
+ // **Get Committed Budget for Specific Department**
+    @GetMapping("/committed/department/{departmentId}")
+    public ResponseEntity<BudgetResponse> getCommittedBudgetForDepartment(@PathVariable Long departmentId) {
+        // Fetch latest approved budget for the department
+        Optional<Budget> latestApprovedBudget = budgetRepository.findTopByDepartmentIdAndApprovedOrderByUpdatedAtDesc(departmentId, true);
+
+        if (latestApprovedBudget.isEmpty()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        // Fetch commitments for the department
+        List<Commitment> departmentCommitments = commitmentRepository.findByDepartmentIdAndApprovedTrue(departmentId);
+        BigDecimal totalCommitments = departmentCommitments.stream()
+            .map(Commitment::getAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Calculate committed budget
+        Budget budget = latestApprovedBudget.get();
+        BudgetResponse response = new BudgetResponse(
+            budget.getId(),
+            budget.getDepartment().getId(),
+            budget.getDepartment().getName(),
+            budget.getAmount().subtract(totalCommitments), // Deduct committed amount
+            budget.isApproved(),
+            budget.getUpdatedAt()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
 }

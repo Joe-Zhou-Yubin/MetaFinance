@@ -12,6 +12,14 @@ import Budget from './pages/budgets/Budget';
 import DepartmentBudget from './pages/budgets/DepartmentBudget';
 import CreateBudget from './pages/budgets/CreateBudget';
 import ExpenseHome from './pages/expenses/ExpenseHome';
+import MyExpenses from './pages/expenses/MyExpenses';
+import ExpenseDetail from './pages/expenses/ExpenseDetail';
+import Commitments from './pages/commitments/Commitments';
+import CreateCommitment from './pages/commitments/CreateCommitments';
+import DepartmentCommitment from './pages/commitments/DepartmentCommitment';
+import Configuration from './pages/configuration/Configuration';
+import ExpenseTypes from './pages/configuration/ExpenseTypes';
+import Inbox from './components/Inbox';
 
 const App = () => {
     // Retrieve user from localStorage
@@ -39,6 +47,24 @@ const App = () => {
                         </>
                     }
                 />
+                <Route
+                    path="/myexpenses"
+                    element={
+                        <>
+                            <Navbar />
+                            <MyExpenses />
+                        </>
+                    }
+                />
+                <Route
+                    path="/myexpenses/:id"
+                    element={
+                        <>
+                            <Navbar />
+                            <ExpenseDetail />
+                        </>
+                    }
+                />
 
                 {/* Role-based route for Admin */}
                 {user && user.roles && user.roles.includes('ROLE_ADMIN') && (
@@ -58,6 +84,24 @@ const App = () => {
                                 <>
                                     <Navbar />
                                     <CreateUser />
+                                </>
+                            }
+                        />
+                        <Route
+                            path="/configuration"
+                            element={
+                                <>
+                                    <Navbar />
+                                    <Configuration />
+                                </>
+                            }
+                        />
+                        <Route
+                            path="/expensetypes"
+                            element={
+                                <>
+                                    <Navbar />
+                                    <ExpenseTypes />
                                 </>
                             }
                         />
@@ -104,7 +148,7 @@ const App = () => {
                         }
                     />
                     <Route
-                        path="/budgets/department/:id"
+                        path="/budgets/department/:departmentId"
                         element={
                             <>
                                 <Navbar />
@@ -118,6 +162,42 @@ const App = () => {
                             <>
                                 <Navbar />
                                 <CreateBudget />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/commitments"
+                        element={
+                            <>
+                                <Navbar />
+                                <Commitments />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/commitments/:departmentId"
+                        element={
+                            <>
+                                <Navbar />
+                                <DepartmentCommitment />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/createcommitment"
+                        element={
+                            <>
+                                <Navbar />
+                                <CreateCommitment />
+                            </>
+                        }
+                    />
+                    <Route
+                        path="/inbox"
+                        element={
+                            <>
+                                <Navbar />
+                                <Inbox />
                             </>
                         }
                     />
